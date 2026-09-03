@@ -1,0 +1,20 @@
+{
+  "name": "nankwanya",
+  "version": "1.0.0",
+  "description": "Nankwanya - Geofencing-Based Blood Donation Mobilization Platform for Uganda",
+  "scripts": {
+    "dev": "concurrently -n \"backend,frontend\" -c \"red,cyan\" \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\"",
+    "start": "concurrently -n \"backend,frontend\" -c \"red,cyan\" \"npm --prefix backend start\" \"npm --prefix frontend run dev\"",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "seed": "node seed/seedData.js",
+    "build": "npm --prefix frontend run build",
+    "test": "node backend/test_backend.js"
+  },
+  "dependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": ["blood-donation", "geofencing", "uganda", "africastalking", "firebase"],
+  "author": "Nankwanya Platform",
+  "license": "MIT"
+}
