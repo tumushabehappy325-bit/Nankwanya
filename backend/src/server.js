@@ -33,7 +33,8 @@ app.get('/api/health', (req, res) => {
     tribute: 'In honor of Hajj Mohamod Nankwanya (215 voluntary blood donations, Uganda Red Cross Society)',
     timestamp: new Date().toISOString(),
     geofenceEngine: 'Haversine Spherical Distance (MVP O(n))',
-    smsGateway: "Africa's Talking API (Uganda)"
+    smsGateway: "Africa's Talking API (Uganda)",
+    deployment: process.env.VERCEL ? 'Vercel Serverless' : 'Standalone Node.js Server'
   });
 });
 
@@ -44,20 +45,24 @@ app.use('/api/requests', requestRoutes);
 app.use('/api/alerts', alertRoutes);
 app.use('/api/stats', statsRoutes);
 
-// Seed on startup if database is empty
-async function initServer() {
+// Auto-seed database if empty
+async function ensureSeeded() {
   try {
     const facilities = await store.getFacilities();
     if (!facilities || facilities.length === 0) {
       console.log('[Server Startup] Store is empty. Running initial Mbarara seed data...');
       await seedDatabase(store);
-    } else {
-      console.log(`[Server Startup] Database ready with ${facilities.length} facilities.`);
     }
   } catch (err) {
-    console.warn('[Server Startup] Auto-seed check notice:', err.message);
+    console.warn('[Server Startup] Seed check notice:', err.message);
   }
+}
 
+// Initial seed execution
+ensureSeeded();
+
+// Only listen on port if running locally or in standalone mode (not on Vercel serverless)
+if (!process.env.VERCEL) {
   app.listen(PORT, () => {
     console.log(`\n=============================================================`);
     console.log(`  🩸 NANKWANYA BACKEND API SERVER RUNNING`);
@@ -67,7 +72,5 @@ async function initServer() {
     console.log(`=============================================================\n`);
   });
 }
-
-initServer();
 
 module.exports = app;

@@ -269,3 +269,24 @@ Follow this exact walkthrough sequence live in front of hackathon judges:
 ## 📜 License & Acknowledgements
 - Named in honor of **Hajj Mohamod Nankwanya** and the **Uganda Red Cross Society** voluntary blood donation teams.
 - Open source under MIT License.
+
+---
+
+## ⚡ One-Click Deployment to Vercel
+
+Nankwanya is pre-configured for full-stack deployment on **Vercel** (`vercel.json` + serverless API handler in `api/index.js`).
+
+### Quick Vercel Setup:
+1. Go to [vercel.com](https://vercel.com) and click **"Add New Project"**.
+2. Select your repository: `tumushabehappy325-bit/Nankwanya`.
+3. Vercel will automatically detect the settings:
+   - **Framework Preset**: *Vite / Other*
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `frontend/dist`
+4. *(Optional)* Add your Environment Variables under **Settings > Environment Variables**:
+   - `AT_USERNAME`: your Africa's Talking username (or `sandbox`)
+   - `AT_API_KEY`: your Africa's Talking API key
+   - `FIREBASE_PROJECT_ID`: your Firebase project ID
+5. Click **"Deploy"**!
+
+Your frontend SPA and serverless `/api` endpoints will be live immediately on your custom `.vercel.app` URL.
