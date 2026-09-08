@@ -2,11 +2,22 @@ const express = require('express');
 const router = express.Router();
 const store = require('../models/store');
 
+function getInitials(name) {
+  if (!name) return 'D.';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return parts.map(p => p[0].toUpperCase() + '.').join('');
+}
+
 // GET /api/alerts - List all alerts with optional query filters
 router.get('/', async (req, res) => {
   try {
     const { bloodRequestId, donorId, status } = req.query;
-    const alerts = await store.getAlerts({ bloodRequestId, donorId, status });
+    const rawAlerts = await store.getAlerts({ bloodRequestId, donorId, status });
+    const alerts = rawAlerts.map(a => ({
+      ...a,
+      donorInitials: getInitials(a.donorName)
+    }));
     res.json({ success: true, count: alerts.length, alerts });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -146,6 +157,49 @@ router.post('/simulate-response', async (req, res) => {
       simulatedStatus: newStatus,
       alert: updated
     });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/alerts/:id/request-contact - Log contact disclosure under Uganda DPPA 2019 and reveal phone number
+router.post('/:id/request-contact', async (req, res) => {
+  try {
+    const alert = await store.getAlertById(req.params.id);
+    if (!alert) {
+      return res.status(404).json({ success: false, error: 'Alert not found' });
+    }
+
+    const { requestedBy = 'Hospital Staff (MRRH Blood Bank)' } = req.body;
+    const requestedAt = new Date().toISOString();
+
+    const disclosure = await store.saveContactDisclosure({
+      alertId: alert.id,
+      requestedBy,
+      requestedAt
+    });
+
+    console.log(`[Contact Disclosure Audit] Alert: ${alert.id} | Donor: ${alert.donorName} | Requested By: ${requestedBy} | At: ${requestedAt}`);
+
+    res.json({
+      success: true,
+      alertId: alert.id,
+      donorName: alert.donorName,
+      donorInitials: getInitials(alert.donorName),
+      phone: alert.donorPhone,
+      disclosure
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/alerts/disclosures/audit - Retrieve complete DPPA disclosure audit logs
+router.get('/disclosures/audit', async (req, res) => {
+  try {
+    const { alertId } = req.query;
+    const disclosures = await store.getContactDisclosures({ alertId });
+    res.json({ success: true, count: disclosures.length, disclosures });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

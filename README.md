@@ -266,6 +266,25 @@ Follow this exact walkthrough sequence live in front of hackathon judges:
 
 ---
 
+## 🏛️ Known Compliance & Scale-Up Steps (not built into this MVP)
+
+This prototype demonstrates core mobilization and geofencing architecture for emergency blood response. In a production rollout across Uganda, the following regulatory, operational, and telecommunications steps are documented prerequisites:
+
+1. **SMS Sender ID Pre-Registration with UCC & Telcos:**
+   - Formal application and registration of an alphanumeric Sender ID (e.g. `NANKWANYA` or `UBTS-ALERT`) with the **Uganda Communications Commission (UCC)**, MTN Uganda, and Airtel Uganda is legally required prior to dispatching public A2P SMS alerts.
+   - Lead time is typically ~2–3 weeks. For this hackathon/pilot demo, **Africa's Talking Sandbox Mode** is utilized.
+2. **Two-Way SMS Reliability at National Scale:**
+   - Standard Application-to-Person (A2P) SMS does not reliably support two-way alphanumeric replies at high volume across mixed telecommunications networks.
+   - While the "reply YES" flow functions smoothly in sandbox and demo testing, the documented production path uses either **in-app confirmations** (via mobile web/USSD `*...#`) or a dedicated **two-way national short code** (e.g. `8888`) registered with UCC.
+3. **Personal Data Protection Office (PDPO) Registration:**
+   - Under Uganda's **Data Protection and Privacy Act (DPPA 2019)**, medical and health attributes (such as blood type) and precise geolocation are classified as **special-category personal data**.
+   - Prior to collecting live donor records in production, Nankwanya must register as a certified **Data Controller and Data Processor** with the **Personal Data Protection Office (PDPO)** under the National Information Technology Authority, Uganda (NITA-U). The current MVP demonstrates strict alignment by enforcing explicit consent on sign-up, masking phone numbers by default, and requiring audited access logs (`contactDisclosures`) before any donor contact is revealed.
+4. **Institutional Role & UBTS Alignment:**
+   - Nankwanya is purposefully positioned as a **digital donor-mobilization and dispatch layer** feeding established **Uganda Blood Transfusion Services (UBTS)** collection regional hubs and certified hospital blood banks (e.g. MRRH).
+   - Nankwanya does **not** conduct blood collection, serological testing (HIV, Hepatitis B/C, Syphilis), or clinical blood storage. All physical testing and transfusions remain strictly under authorized Ministry of Health and UBTS clinical supervision.
+
+---
+
 ## 📜 License & Acknowledgements
 - Named in honor of **Hajj Mohamod Nankwanya** and the **Uganda Red Cross Society** voluntary blood donation teams.
 - Open source under MIT License.

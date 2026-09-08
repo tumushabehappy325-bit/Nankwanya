@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   Heart, MapPin, Navigation, Smartphone, CheckCircle, XCircle,
-  AlertTriangle, Clock, Shield, Award, Sparkles, Check, ChevronDown
+  AlertTriangle, Clock, Shield, Award, Sparkles, Check, ChevronDown,
+  Plus, X, Lock, FileCheck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { fetchDonors, fetchAlerts, respondToAlert, updateDonorLocation, registerOrUpdateDonor } from '../services/api';
@@ -26,6 +27,17 @@ export default function DonorPortal() {
   const [locSuccess, setLocSuccess] = useState(null);
   const [isResponding, setIsResponding] = useState(false);
   const [responseSuccess, setResponseSuccess] = useState(null);
+
+  // Donor Registration Modal state
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [regName, setRegName] = useState('');
+  const [regPhone, setRegPhone] = useState('+25677');
+  const [regBloodType, setRegBloodType] = useState('O+');
+  const [regNeighborhood, setRegNeighborhood] = useState(MBARARA_PRESETS[0].name);
+  const [regLastDonation, setRegLastDonation] = useState('');
+  const [regConsent, setRegConsent] = useState(false); // Visible checkbox, NOT pre-checked
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [regError, setRegError] = useState(null);
 
   // Load donor list and alerts
   useEffect(() => {
@@ -148,7 +160,53 @@ export default function DonorPortal() {
     }
   };
 
+  const handleRegisterSubmit = async (e) => {
+    e.preventDefault();
+    if (!regConsent) {
+      setRegError('You must provide consent under the Uganda DPPA 2019 to complete registration.');
+      return;
+    }
+    setIsRegistering(true);
+    setRegError(null);
+
+    try {
+      const selectedPreset = MBARARA_PRESETS.find(p => p.name === regNeighborhood) || MBARARA_PRESETS[0];
+      const res = await registerOrUpdateDonor({
+        name: regName.trim(),
+        phone: regPhone.trim(),
+        bloodType: regBloodType,
+        lat: selectedPreset.lat,
+        lng: selectedPreset.lng,
+        neighborhood: regNeighborhood,
+        lastDonationDate: regLastDonation ? new Date(regLastDonation).toISOString().split('T')[0] : null,
+        consentGiven: true,
+        consentTimestamp: new Date().toISOString()
+      });
+
+      if (res.success && res.donor) {
+        setAllDonors(prev => [res.donor, ...prev]);
+        setDonor(res.donor);
+        updateUserProfile(res.donor);
+        setIsRegisterModalOpen(false);
+        setRegName('');
+        setRegPhone('+25677');
+        setRegConsent(false);
+        setLocSuccess(`Registered as verified voluntary donor with DPPA consent!`);
+      } else {
+        setRegError(res.error || 'Registration failed');
+      }
+    } catch (err) {
+      setRegError(err.message || 'Error creating donor profile');
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
   const latestAlert = alerts[0];
+  const daysSince = donor?.lastDonationDate
+    ? Math.floor((Date.now() - new Date(donor.lastDonationDate).getTime()) / 86400000)
+    : null;
+  const isEligible = daysSince === null || daysSince >= 90;
 
   return (
     <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-6">
@@ -156,8 +214,8 @@ export default function DonorPortal() {
       <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-rose-600/10 rounded-full blur-2xl" />
 
-        {/* Demo donor switcher */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
+        {/* Demo donor switcher & New Donor Trigger */}
+        <div className="flex flex-wrap items-center justify-between border-b border-slate-800 pb-4 mb-4 gap-2">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
@@ -166,7 +224,14 @@ export default function DonorPortal() {
           </div>
 
           <div className="flex items-center gap-2">
-            <label className="text-[11px] text-slate-400 hidden sm:inline">Switch Donor:</label>
+            <button
+              onClick={() => setIsRegisterModalOpen(true)}
+              className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold text-xs shadow-md shadow-rose-950 transition flex items-center gap-1"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Register New</span>
+            </button>
+
             <select
               value={donor?.id || ''}
               onChange={(e) => handleSelectDonor(e.target.value)}
@@ -194,17 +259,36 @@ export default function DonorPortal() {
                 <MapPin className="w-3.5 h-3.5 text-rose-400" />
                 <span>{donor?.neighborhood || 'Kamukuzi, Mbarara'}</span>
               </div>
+              <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 mt-1 font-medium">
+                <FileCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>
+                  DPPA Consent Verified & Stored
+                  {donor?.consentTimestamp ? ` (${new Date(donor.consentTimestamp).toLocaleDateString()})` : ''}
+                </span>
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-col items-end gap-1">
-            <span className="text-[11px] px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold flex items-center gap-1">
-              <Shield className="w-3 h-3" />
-              Eligible to Donate
-            </span>
+          <div className="flex flex-col items-end gap-1.5">
+            {isEligible ? (
+              <span className="text-[11px] px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold flex items-center gap-1">
+                <Shield className="w-3 h-3" />
+                Eligible to Donate (≥90d)
+              </span>
+            ) : (
+              <span className="text-[11px] px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                Recently Donated ({daysSince}d ago)
+              </span>
+            )}
             <span className="text-[10px] text-slate-400">
-              {donor?.totalDonations || 6} Total Voluntary Donations
+              {donor?.totalDonations || (daysSince !== null ? 1 : 0)} Total Voluntary Donations
             </span>
+            {!isEligible && (
+              <span className="text-[10px] text-amber-400 font-medium text-right max-w-[160px]">
+                Excluded from live alerts until 90-day recovery period elapses ({90 - daysSince}d left)
+              </span>
+            )}
           </div>
         </div>
 
@@ -349,6 +433,157 @@ export default function DonorPortal() {
           Following the example of <strong>Hajj Mohamod Nankwanya</strong> (215 blood donations). Every voluntary donor is a pillar of Uganda's health resilience.
         </span>
       </div>
+
+      {/* Donor Registration Modal with DPPA 2019 Consent Flow */}
+      {isRegisterModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl max-w-lg w-full p-6 md:p-8 shadow-2xl relative max-h-[92vh] overflow-y-auto">
+            {/* Close button */}
+            <button
+              onClick={() => setIsRegisterModalOpen(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-xl hover:bg-slate-800 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-rose-600 to-red-500 flex items-center justify-center shadow-lg shadow-rose-950">
+                <Heart className="w-6 h-6 text-white fill-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-white">Join Voluntary Donor Network</h2>
+                <p className="text-xs text-slate-400">
+                  Nankwanya Emergency Mobilization (Uganda)
+                </p>
+              </div>
+            </div>
+
+            {regError && (
+              <div className="mb-4 p-3 rounded-xl bg-rose-950/60 border border-rose-800/80 text-rose-300 text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{regError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleRegisterSubmit} className="space-y-4">
+              {/* Full Name */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Katushabe Allen"
+                  value={regName}
+                  onChange={(e) => setRegName(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                />
+              </div>
+
+              {/* Phone & Blood Type */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                    Phone Number (SMS)
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="+256770000000"
+                    value={regPhone}
+                    onChange={(e) => setRegPhone(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 font-mono focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                    Blood Type
+                  </label>
+                  <select
+                    value={regBloodType}
+                    onChange={(e) => setRegBloodType(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 font-bold focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  >
+                    {['O+', 'A+', 'B+', 'AB+', 'O-', 'A-', 'B-', 'AB-'].map(bt => (
+                      <option key={bt} value={bt}>{bt}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Neighborhood / Preset Location */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Mbarara Neighborhood (Geofence Base)
+                </label>
+                <select
+                  value={regNeighborhood}
+                  onChange={(e) => setRegNeighborhood(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                >
+                  {MBARARA_PRESETS.map(p => (
+                    <option key={p.name} value={p.name}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Last Donation Date (Optional) */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                  Last Blood Donation Date (Optional)
+                </label>
+                <p className="text-[11px] text-slate-400 mb-1.5">
+                  Helps enforce the 90-day minimum donation recovery interval. Leave empty if first-time donor.
+                </p>
+                <input
+                  type="date"
+                  value={regLastDonation}
+                  onChange={(e) => setRegLastDonation(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                />
+              </div>
+
+              {/* Consent-First Language (Uganda DPPA 2019) */}
+              <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                <label className="flex items-start gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    id="dppa-consent-checkbox"
+                    checked={regConsent}
+                    onChange={(e) => setRegConsent(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded bg-slate-800 border-slate-600 text-rose-500 focus:ring-rose-500 focus:ring-offset-0 cursor-pointer shrink-0"
+                  />
+                  <span className="text-xs text-slate-200 leading-snug font-medium">
+                    I consent to Nankwanya storing my location and blood type to send me donation alerts. I can withdraw this anytime.
+                  </span>
+                </label>
+                <p className="text-[10px] text-slate-400 pl-7 leading-normal">
+                  In compliance with Uganda's <strong>Data Protection and Privacy Act (DPPA 2019)</strong>: Location and blood type are treated as special-category health data. Your number is masked and protected against commercial harvesting.
+                </p>
+              </div>
+
+              {/* Submit Button (Blocked until consent checked) */}
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={!regConsent || isRegistering || !regName || !regPhone}
+                  className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs shadow-xl shadow-rose-950/60 transition flex items-center justify-center gap-2"
+                >
+                  <Lock className="w-4 h-4" />
+                  {isRegistering
+                    ? 'Registering with Consent...'
+                    : !regConsent
+                    ? 'Check Consent to Enable Registration'
+                    : 'Submit Voluntary Donor Registration'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -31,11 +31,23 @@ export default function CreateRequestModal({
 
   const selectedFacility = facilities.find(f => f.id === facilityId) || facilities[0];
 
-  // Client-side quick estimator for live slider feedback
+  // Client-side estimator for live slider feedback (mirrors backend 3-condition filter)
   const estimateMatchedDonors = () => {
     if (!selectedFacility || !donors.length) return 0;
     const toRad = (d) => (d * Math.PI) / 180;
+    const RBC = {
+      'O-': ['O-'],
+      'O+': ['O-', 'O+'],
+      'A-': ['O-', 'A-'],
+      'A+': ['O-', 'O+', 'A-', 'A+'],
+      'B-': ['O-', 'B-'],
+      'B+': ['O-', 'O+', 'B-', 'B+'],
+      'AB-': ['O-', 'A-', 'B-', 'AB-'],
+      'AB+': ['O-', 'O+', 'A-', 'A+', 'B-', 'B+', 'AB-', 'AB+']
+    };
+
     return donors.filter(d => {
+      // Condition 1: Within radius
       const dLat = toRad(d.lat - selectedFacility.lat);
       const dLon = toRad(d.lng - selectedFacility.lng);
       const a =
@@ -43,11 +55,21 @@ export default function CreateRequestModal({
         Math.cos(toRad(selectedFacility.lat)) * Math.cos(toRad(d.lat)) *
         Math.sin(dLon / 2) * Math.sin(dLon / 2);
       const dist = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      if (dist > radiusKm) return false;
 
-      const typeMatch = bloodType === 'ANY' || d.bloodType === bloodType ||
-        (bloodType === 'B+' && (d.bloodType === 'B+' || d.bloodType === 'B-' || d.bloodType === 'O+' || d.bloodType === 'O-'));
+      // Condition 2: Blood type compatibility
+      const cleanReq = bloodType?.toUpperCase();
+      const cleanDonor = d.bloodType?.toUpperCase();
+      const compatible = cleanReq === 'ANY' || (RBC[cleanReq] ? RBC[cleanReq].includes(cleanDonor) : cleanDonor === cleanReq);
+      if (!compatible) return false;
 
-      return dist <= radiusKm && typeMatch;
+      // Condition 3: Minimum 90-day donation interval
+      if (d.lastDonationDate) {
+        const days = Math.floor((Date.now() - new Date(d.lastDonationDate).getTime()) / (1000 * 60 * 60 * 24));
+        if (days < 90) return false;
+      }
+
+      return true;
     }).length;
   };
 
@@ -254,7 +276,9 @@ export default function CreateRequestModal({
           {/* Pre-Broadcast Live Summary Box */}
           <div className="p-4 rounded-xl bg-gradient-to-r from-rose-950/40 to-slate-800 border border-rose-900/50 flex items-center justify-between">
             <div className="space-y-0.5">
-              <div className="text-xs text-slate-400">Target Audience Match</div>
+              <div className="text-xs text-slate-400">
+                Target Audience Match (Within {radiusKm}km • RBC Match • &ge;90d Interval)
+              </div>
               <div className="text-sm font-semibold text-slate-200">
                 Ready to SMS <strong className="text-rose-400 font-mono">{estimatedCount}</strong> eligible donors
               </div>

@@ -1,7 +1,15 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { Hospital, UserCheck, Clock, MapPin, AlertCircle } from 'lucide-react';
+import { Hospital, UserCheck, Clock, MapPin, AlertCircle, Shield, PhoneCall, Lock } from 'lucide-react';
+import { requestDonorContact } from '../services/api';
+
+function getInitials(name) {
+  if (!name) return 'D.';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return parts.map(p => p[0].toUpperCase() + '.').join('');
+}
 
 // Fix Leaflet's default icon missing issue in webpack/vite
 delete L.Icon.Default.prototype._getIconUrl;
@@ -73,6 +81,29 @@ export default function MapView({
   alerts.forEach(a => {
     alertStatusMap.set(a.donorId || a.donorPhone, a);
   });
+
+  const [revealedContacts, setRevealedContacts] = useState({});
+  const [requestingId, setRequestingId] = useState(null);
+
+  const handleRequestContact = async (alert) => {
+    try {
+      setRequestingId(alert.id);
+      const res = await requestDonorContact(alert.id, 'Hospital Coordinator (MRRH Blood Bank)');
+      if (res.success) {
+        setRevealedContacts(prev => ({
+          ...prev,
+          [alert.id]: {
+            phone: res.phone,
+            requestedAt: res.disclosure?.requestedAt || new Date().toISOString()
+          }
+        }));
+      }
+    } catch (e) {
+      console.error('Failed to request donor contact from map:', e);
+    } finally {
+      setRequestingId(null);
+    }
+  };
 
   return (
     <div className="relative w-full rounded-2xl overflow-hidden border border-slate-800 shadow-2xl bg-slate-950" style={{ height }}>
@@ -146,9 +177,9 @@ export default function MapView({
               icon={icon}
             >
               <Popup>
-                <div className="p-1.5 space-y-1.5 min-w-[190px] text-slate-800">
+                <div className="p-1.5 space-y-1.5 min-w-[200px] text-slate-800">
                   <div className="flex items-center justify-between border-b pb-1">
-                    <span className="font-bold text-slate-900 text-sm">{donor.name}</span>
+                    <span className="font-bold text-slate-900 text-sm">Donor {getInitials(donor.name)}</span>
                     <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-rose-100 text-rose-700">
                       {donor.bloodType}
                     </span>
@@ -164,14 +195,56 @@ export default function MapView({
                         Distance: <strong>{donor.distanceKm} km</strong> from facility
                       </div>
                     )}
-                    <div className="text-slate-500 font-mono text-[11px]">
-                      {donor.phone}
-                    </div>
+                    {donor.lastDonationDate ? (
+                      (() => {
+                        const days = Math.floor((Date.now() - new Date(donor.lastDonationDate).getTime()) / 86400000);
+                        return (
+                          <div className={`text-[10px] ${days >= 90 ? 'text-emerald-700 font-medium' : 'text-amber-800 font-bold'}`}>
+                            {days >= 90
+                              ? `✓ Donation eligible (last: ${days}d ago)`
+                              : `⏳ Excluded: Donated ${days}d ago (< 90d interval)`}
+                          </div>
+                        );
+                      })()
+                    ) : (
+                      <div className="text-[10px] text-emerald-700 font-medium">
+                        ✓ First-time donor (Eligible)
+                      </div>
+                    )}
                   </div>
 
-                  {alert && (
-                    <div className="pt-1.5 border-t border-slate-200">
-                      <div className="flex items-center justify-between text-xs">
+                  {/* DPPA 2019 Masked Contact / Request Contact Button */}
+                  <div className="pt-1.5 border-t border-slate-200 space-y-1">
+                    {alert && status === 'confirmed' ? (
+                      revealedContacts[alert.id] ? (
+                        <div className="p-1.5 rounded bg-emerald-50 border border-emerald-300 text-[11px] text-emerald-900 space-y-0.5">
+                          <div className="font-bold flex items-center gap-1">
+                            <PhoneCall className="w-3 h-3 text-emerald-600" />
+                            <span className="font-mono">{revealedContacts[alert.id].phone}</span>
+                          </div>
+                          <div className="text-[9px] text-emerald-700">
+                            Audited Disclosure (DPPA 2019)
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleRequestContact(alert)}
+                          disabled={requestingId === alert.id}
+                          className="w-full py-1 px-2 rounded bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] transition flex items-center justify-center gap-1 shadow-sm"
+                        >
+                          <Lock className="w-3 h-3" />
+                          {requestingId === alert.id ? 'Logging...' : 'Request Contact (DPPA)'}
+                        </button>
+                      )
+                    ) : (
+                      <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1">
+                        <Shield className="w-3 h-3 text-slate-400" />
+                        <span>Phone Masked (DPPA 2019)</span>
+                      </div>
+                    )}
+
+                    {alert && (
+                      <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
                         <span className="text-slate-500">Alert Status:</span>
                         <span className={`font-bold uppercase text-[10px] px-1.5 py-0.5 rounded ${
                           status === 'confirmed' ? 'bg-emerald-100 text-emerald-700' :
@@ -183,13 +256,8 @@ export default function MapView({
                            '● SMS Alerted'}
                         </span>
                       </div>
-                      {alert.respondedAt && (
-                        <div className="text-[10px] text-slate-400 mt-1">
-                          Responded: {new Date(alert.respondedAt).toLocaleTimeString()}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </Popup>
             </Marker>

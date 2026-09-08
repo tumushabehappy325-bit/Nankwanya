@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
-import { Terminal, X, CheckCircle, AlertCircle, RefreshCw, Send, ShieldCheck } from 'lucide-react';
+import { Terminal, X, CheckCircle, AlertCircle, RefreshCw, Send, ShieldCheck, Lock } from 'lucide-react';
+
+function getInitials(name) {
+  if (!name) return 'D.';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return parts.map(p => p[0].toUpperCase() + '.').join('');
+}
 
 export default function SmsLogDrawer({ isOpen, onClose, alerts = [] }) {
   const [filter, setFilter] = useState('all');
@@ -74,9 +81,10 @@ export default function SmsLogDrawer({ isOpen, onClose, alerts = [] }) {
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
                   <div className="flex items-center gap-2">
                     <span className="text-slate-500">{new Date(log.sentAt || Date.now()).toLocaleTimeString()}</span>
-                    <span className="font-bold text-slate-200">{log.donorName}</span>
-                    <span className="text-sky-400 bg-sky-950/60 px-2 py-0.5 rounded border border-sky-800/50">
-                      {log.donorPhone}
+                    <span className="font-bold text-slate-200">Donor {getInitials(log.donorName)}</span>
+                    <span className="text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800 font-mono text-[10px] flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5 text-slate-500" />
+                      {log.donorPhone ? `${log.donorPhone.slice(0, 6)} ••• •••` : 'Protected'}
                     </span>
                   </div>
 

@@ -85,9 +85,32 @@ function generateSeedDonors() {
     const bloodType = BLOOD_TYPE_DISTRIBUTION[index % BLOOD_TYPE_DISTRIBUTION.length];
     const phoneNum = String(index + 1).padStart(3, '0');
 
-    // Last donation between 30 and 150 days ago
-    const daysAgo = Math.floor(Math.random() * 120) + 30;
-    const lastDonation = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    // Vary last donation interval across donors:
+    // Some recent (<90 days: e.g. 14, 28, 45, 60 days ago) to visibly demonstrate eligibility filtering during live demos,
+    // some eligible (>=90 days: e.g. 95, 120, 180 days ago), and some first-time voluntary donors (null).
+    let daysAgo;
+    let lastDonation;
+    if (index === 1) {
+      daysAgo = 14; // Exactly 2 weeks ago: prime demo case ("notice this donor didn't get alerted - gave blood 2 weeks ago")
+    } else if (index === 2) {
+      daysAgo = 35; // ~5 weeks ago: recently donated
+    } else if (index === 4) {
+      daysAgo = 56; // 8 weeks ago: recently donated
+    } else if (index === 7) {
+      daysAgo = 72; // ~10 weeks ago: recently donated
+    } else if (index % 5 === 0) {
+      daysAgo = Math.floor(Math.random() * 60) + 14; // 14-74 days ago (ineligible)
+    } else if (index % 7 === 0) {
+      daysAgo = null; // First-time voluntary donor (eligible)
+    } else {
+      daysAgo = Math.floor(Math.random() * 120) + 95; // 95-215 days ago (eligible)
+    }
+
+    lastDonation = daysAgo !== null
+      ? new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      : null;
+
+    const createdAt = new Date(Date.now() - (index + 1) * 86400000).toISOString();
 
     donors.push({
       id: `usr_donor_${index + 1}`,
@@ -99,8 +122,10 @@ function generateSeedDonors() {
       lng: Math.round((neighborhood.lng + jitterLng) * 100000) / 100000,
       lastDonationDate: lastDonation,
       neighborhood: neighborhood.name,
-      totalDonations: Math.floor(Math.random() * 8) + 1,
-      createdAt: new Date(Date.now() - (index + 1) * 86400000).toISOString()
+      totalDonations: daysAgo === null ? 0 : Math.floor(Math.random() * 8) + 1,
+      consentGiven: true,
+      consentTimestamp: createdAt,
+      createdAt
     });
   });
 

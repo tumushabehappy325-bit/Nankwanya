@@ -44,12 +44,21 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST /api/donors - Register or update donor
+// POST /api/donors - Register or update donor (with Uganda DPPA 2019 consent requirement)
 router.post('/', async (req, res) => {
   try {
-    const { id, name, phone, bloodType, lat, lng, lastDonationDate } = req.body;
+    const { id, name, phone, bloodType, lat, lng, lastDonationDate, neighborhood, consentGiven, consentTimestamp } = req.body;
     if (!phone || !bloodType) {
       return res.status(400).json({ success: false, error: 'Phone and bloodType are required' });
+    }
+
+    const isConsentGiven = consentGiven === true || consentGiven === 'true';
+    // For new registrations (no existing id), consent is strictly required under Uganda DPPA 2019
+    if (!id && !isConsentGiven) {
+      return res.status(400).json({
+        success: false,
+        error: 'Consent is required under the Uganda Data Protection and Privacy Act (DPPA 2019) to store location and blood type for alerts.'
+      });
     }
 
     const saved = await store.saveUser({
@@ -60,7 +69,10 @@ router.post('/', async (req, res) => {
       role: 'donor',
       lat: Number(lat) || -0.607,
       lng: Number(lng) || 30.654,
-      lastDonationDate: lastDonationDate || null
+      lastDonationDate: lastDonationDate || null,
+      neighborhood: neighborhood || 'Mbarara Town',
+      consentGiven: isConsentGiven,
+      consentTimestamp: consentTimestamp || (isConsentGiven ? new Date().toISOString() : null)
     });
 
     res.status(201).json({ success: true, donor: saved });

@@ -93,7 +93,46 @@ function isBloodCompatible(donorBloodType, requestedBloodType, exactMatchOnly = 
 }
 
 /**
- * Filters donors within radius R of facility coordinates and matching blood type
+ * Standard minimum interval between whole-blood donations in days (~3 months / 90 days per WHO & UBTS guidelines)
+ * Exported as a named constant so it is easy to justify or adjust in demo Q&As.
+ */
+const MIN_DONATION_INTERVAL_DAYS = 90;
+
+/**
+ * Checks if a donor has satisfied the minimum donation interval (>= 90 days).
+ * Donors who have never donated (null/undefined lastDonationDate) are eligible.
+ * @param {string|Date|null} lastDonationDate - Last donation date (ISO string or Date)
+ * @param {Date} [referenceDate=new Date()] - Reference date (defaults to current time)
+ * @returns {{ eligible: boolean, daysSinceDonation: number|null }}
+ */
+function isDonationIntervalElapsed(lastDonationDate, referenceDate = new Date()) {
+  if (!lastDonationDate) {
+    return { eligible: true, daysSinceDonation: null };
+  }
+
+  const lastDate = new Date(lastDonationDate);
+  if (isNaN(lastDate.getTime())) {
+    return { eligible: true, daysSinceDonation: null };
+  }
+
+  const diffMs = referenceDate.getTime() - lastDate.getTime();
+  const daysSince = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  return {
+    eligible: daysSince >= MIN_DONATION_INTERVAL_DAYS,
+    daysSinceDonation: daysSince
+  };
+}
+
+/**
+ * Filters donors within radius R of facility coordinates, matching blood type,
+ * and eligible to donate (minimum 90-day interval elapsed since last donation).
+ * 
+ * Filters on THREE conditions:
+ * 1. Within radius (Haversine spherical distance <= radiusKm)
+ * 2. Blood type compatibility (RBC compatibility matrix)
+ * 3. Eligible to donate again (lastDonationDate >= 90 days ago, or never donated)
+ * 
  * @param {Object} params
  * @param {number} params.facilityLat - Facility latitude
  * @param {number} params.facilityLng - Facility longitude
@@ -101,7 +140,8 @@ function isBloodCompatible(donorBloodType, requestedBloodType, exactMatchOnly = 
  * @param {string} params.bloodType - Blood type needed (e.g. 'O+', 'A-', 'ANY')
  * @param {Array} params.donors - List of donor records
  * @param {boolean} [params.exactMatchOnly=false] - Whether to enforce exact type match
- * @returns {Array} List of matched donors with attached distanceKm
+ * @param {Date} [params.referenceDate=new Date()] - Reference date for donation interval check
+ * @returns {Array} List of matched donors with attached distanceKm, sorted nearest first
  */
 function findEligibleDonors({
   facilityLat,
@@ -109,7 +149,8 @@ function findEligibleDonors({
   radiusKm = 5,
   bloodType = 'ANY',
   donors = [],
-  exactMatchOnly = false
+  exactMatchOnly = false,
+  referenceDate = new Date()
 }) {
   if (!facilityLat || !facilityLng || !Array.isArray(donors)) {
     return [];
@@ -127,22 +168,27 @@ function findEligibleDonors({
       );
 
       const compatible = isBloodCompatible(donor.bloodType, bloodType, exactMatchOnly);
+      const intervalCheck = isDonationIntervalElapsed(donor.lastDonationDate, referenceDate);
 
       return {
         ...donor,
         distanceKm: distance,
         isWithinRadius: distance <= radius,
-        isBloodCompatible: compatible
+        isBloodCompatible: compatible,
+        isDonationEligible: intervalCheck.eligible,
+        daysSinceLastDonation: intervalCheck.daysSinceDonation
       };
     })
-    .filter((donor) => donor.isWithinRadius && donor.isBloodCompatible)
+    .filter((donor) => donor.isWithinRadius && donor.isBloodCompatible && donor.isDonationEligible)
     .sort((a, b) => a.distanceKm - b.distanceKm); // Nearest first
 }
 
 module.exports = {
   EARTH_RADIUS_KM,
+  MIN_DONATION_INTERVAL_DAYS,
   haversineDistance,
   isBloodCompatible,
+  isDonationIntervalElapsed,
   findEligibleDonors,
   RBC_COMPATIBILITY
 };

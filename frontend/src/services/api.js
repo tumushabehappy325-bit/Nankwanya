@@ -100,3 +100,18 @@ export async function simulateSmsResponse({ alertId, donorId, donorPhone, action
   });
   return res.json();
 }
+
+export async function requestDonorContact(alertId, requestedBy = 'Hospital Staff') {
+  const res = await fetch(`${API_BASE}/alerts/${alertId}/request-contact`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ requestedBy })
+  });
+  return res.json();
+}
+
+export async function fetchContactDisclosures(alertId) {
+  const query = alertId ? `?alertId=${alertId}` : '';
+  const res = await fetch(`${API_BASE}/alerts/disclosures/audit${query}`);
+  return res.json();
+}

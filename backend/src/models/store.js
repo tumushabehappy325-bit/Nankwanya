@@ -14,6 +14,7 @@ class DataStore {
     this.facilities = new Map();
     this.bloodRequests = new Map();
     this.alerts = new Map();
+    this.contactDisclosures = new Map();
   }
 
   get db() {
@@ -72,6 +73,8 @@ class DataStore {
       lng: Number(user.lng) || 30.654,
       lastDonationDate: user.lastDonationDate || null,
       facilityId: user.facilityId || null,
+      consentGiven: user.consentGiven === true || user.consentGiven === 'true',
+      consentTimestamp: user.consentTimestamp || (user.consentGiven ? new Date().toISOString() : null),
       createdAt: user.createdAt || new Date().toISOString()
     };
 
@@ -310,6 +313,43 @@ class DataStore {
   async getLatestPendingAlertForDonor(donorId) {
     const alerts = await this.getAlerts({ donorId });
     return alerts.find(a => a.status === 'sent' || a.status === 'delivered') || alerts[0] || null;
+  }
+
+  // ================= CONTACT DISCLOSURES (UGANDA DPPA 2019 AUDIT TRAIL) =================
+  async saveContactDisclosure({ alertId, requestedBy, requestedAt }) {
+    const id = `disc_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const disclosureData = {
+      id,
+      alertId,
+      requestedBy: requestedBy || 'Hospital Staff',
+      requestedAt: requestedAt || new Date().toISOString()
+    };
+
+    if (this.db) {
+      try {
+        await this.db.collection('contactDisclosures').doc(id).set(disclosureData);
+      } catch (e) {
+        console.warn('[Store] Firestore saveContactDisclosure error:', e.message);
+      }
+    }
+    this.contactDisclosures.set(id, disclosureData);
+    return disclosureData;
+  }
+
+  async getContactDisclosures(filter = {}) {
+    if (this.db) {
+      try {
+        let query = this.db.collection('contactDisclosures');
+        if (filter.alertId) query = query.where('alertId', '==', filter.alertId);
+        const snapshot = await query.get();
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      } catch (e) {
+        console.warn('[Store] Firestore getContactDisclosures fallback:', e.message);
+      }
+    }
+    let list = Array.from(this.contactDisclosures.values());
+    if (filter.alertId) list = list.filter(d => d.alertId === filter.alertId);
+    return list.sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt));
   }
 }
 

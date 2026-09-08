@@ -2,7 +2,13 @@
  * Automated Verification Test for Nankwanya Backend
  */
 
-const { haversineDistance, isBloodCompatible, findEligibleDonors } = require('./src/services/geofence');
+const {
+  haversineDistance,
+  isBloodCompatible,
+  findEligibleDonors,
+  MIN_DONATION_INTERVAL_DAYS,
+  isDonationIntervalElapsed
+} = require('./src/services/geofence');
 const store = require('./src/models/store');
 const { seedDatabase, MBARARA_FACILITIES } = require('../seed/seedData');
 const { sendSMS, normalizeUgandaPhone, composeBloodAlertMessage } = require('./src/services/smsService');
@@ -55,25 +61,52 @@ async function runTests() {
   const mrrh = await store.getFacilityById('fac_mrrh');
   assert(mrrh && mrrh.name.includes('Mbarara Regional Referral Hospital'), `MRRH retrieved correctly`);
 
-  // 4. Geofence Filter Test
-  console.log('\n[4] Testing Geofence Matching...');
+  // 4. Geofence Filter & Donation Interval Test
+  console.log('\n[4] Testing Geofence Matching & 90-Day Donation Interval...');
+  assert(MIN_DONATION_INTERVAL_DAYS === 90, 'MIN_DONATION_INTERVAL_DAYS named constant is 90');
+
+  // Test interval helper
+  const now = new Date();
+  const date14DaysAgo = new Date(now.getTime() - 14 * 86400000).toISOString().split('T')[0];
+  const date95DaysAgo = new Date(now.getTime() - 95 * 86400000).toISOString().split('T')[0];
+  
+  const check14 = isDonationIntervalElapsed(date14DaysAgo, now);
+  assert(check14.eligible === false, 'Donor who donated 14 days ago is INELIGIBLE (<90 days)');
+  assert(check14.daysSinceDonation >= 13 && check14.daysSinceDonation <= 15, `Computed days since donation is ${check14.daysSinceDonation}`);
+
+  const check95 = isDonationIntervalElapsed(date95DaysAgo, now);
+  assert(check95.eligible === true, 'Donor who donated 95 days ago is ELIGIBLE (>=90 days)');
+
+  const checkNever = isDonationIntervalElapsed(null, now);
+  assert(checkNever.eligible === true, 'First-time donor (null date) is ELIGIBLE');
+
   const allDonors = await store.getUsers({ role: 'donor' });
   const matched5km = findEligibleDonors({
     facilityLat: mrrh.lat,
     facilityLng: mrrh.lng,
     radiusKm: 5,
     bloodType: 'O+',
-    donors: allDonors
+    donors: allDonors,
+    referenceDate: now
   });
-  assert(matched5km.length > 0, `Found ${matched5km.length} O+ donors within 5 km of MRRH`);
+  assert(matched5km.length > 0, `Found ${matched5km.length} eligible O+ donors within 5 km of MRRH`);
   assert(matched5km[0].distanceKm <= matched5km[matched5km.length - 1].distanceKm, 'Donors sorted nearest first');
+
+  // Verify that any donor with lastDonationDate < 90 days ago is NOT in matched5km
+  const anyRecentInMatched = matched5km.some(d => {
+    if (!d.lastDonationDate) return false;
+    const diff = Math.floor((now.getTime() - new Date(d.lastDonationDate).getTime()) / 86400000);
+    return diff < 90;
+  });
+  assert(!anyRecentInMatched, 'Zero recent donors (<90 days) included in matched alerts (3-condition filter verified)');
 
   const matched2km = findEligibleDonors({
     facilityLat: mrrh.lat,
     facilityLng: mrrh.lng,
     radiusKm: 2,
     bloodType: 'O+',
-    donors: allDonors
+    donors: allDonors,
+    referenceDate: now
   });
   assert(matched2km.length <= matched5km.length, `2km radius (${matched2km.length}) is subset of 5km radius (${matched5km.length})`);
 
@@ -146,6 +179,37 @@ async function runTests() {
     responseChannel: 'sms'
   });
   assert(confirmedAlert.status === 'confirmed', 'Alert updated to confirmed status');
+
+  // 7. Uganda DPPA 2019 Contact Disclosure Audit Trail Test
+  console.log('\n[7] Testing DPPA 2019 Contact Disclosure Audit Trail...');
+  const disclosure = await store.saveContactDisclosure({
+    alertId: alert.id,
+    requestedBy: 'Sister Mary Kyomukama (MRRH)',
+    requestedAt: new Date().toISOString()
+  });
+  assert(disclosure.id.startsWith('disc_'), `Created contact disclosure audit record: ${disclosure.id}`);
+  assert(disclosure.requestedBy === 'Sister Mary Kyomukama (MRRH)', 'Recorded requester identity');
+
+  const disclosuresForAlert = await store.getContactDisclosures({ alertId: alert.id });
+  assert(disclosuresForAlert.length >= 1, `Retrieved ${disclosuresForAlert.length} disclosure records for alert ${alert.id}`);
+  assert(disclosuresForAlert[0].alertId === alert.id, 'Audit record correctly linked to alert');
+
+  // 8. Uganda DPPA 2019 Donor Consent Enforcement Test
+  console.log('\n[8] Testing DPPA 2019 Donor Consent Enforcement...');
+  const testConsentDonor = await store.saveUser({
+    name: 'Byamugisha Ronald',
+    phone: '+256770999888',
+    bloodType: 'O+',
+    role: 'donor',
+    consentGiven: true,
+    consentTimestamp: new Date().toISOString()
+  });
+  assert(testConsentDonor.consentGiven === true, 'Donor record saved with consentGiven = true');
+  assert(testConsentDonor.consentTimestamp !== null, `Consent timestamp recorded: ${testConsentDonor.consentTimestamp}`);
+
+  // Seed donors consent check
+  const seededWithConsent = allDonors.filter(d => d.consentGiven === true);
+  assert(seededWithConsent.length === allDonors.length, `All ${allDonors.length} seeded donors have verified DPPA consent on file`);
 
   console.log(`\n=============================================================`);
   console.log(`🎉 TEST SUMMARY: ${passed} Passed, ${failed} Failed`);
