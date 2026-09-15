@@ -8,7 +8,8 @@
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
     "seed": "node seed/seedData.js",
-    "build": "npm --prefix frontend run build",
+    "build": "npm --prefix frontend install && npm --prefix frontend run build",
+    "postinstall": "npm --prefix frontend install",
     "test": "node backend/test_backend.js"
   },
   "dependencies": {
