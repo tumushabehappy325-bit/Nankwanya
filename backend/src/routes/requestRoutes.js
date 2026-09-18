@@ -116,11 +116,34 @@ router.post('/', async (req, res) => {
       alertResults.push(alertDoc);
     }
 
+    // 5. Update request with notified donors and sent count
+    const notifiedDonors = matchedDonors.map(d => ({
+      id: d.id,
+      name: d.name,
+      phone: d.phone,
+      bloodType: d.bloodType,
+      distanceKm: d.distanceKm
+      
+    }));
+
+    await store.updateBloodRequest(savedRequest.id, {
+      notifiedDonors,
+      smsSentCount: alertResults.length
+    });
+
+    const finalRequest = {
+      ...savedRequest,
+      notifiedDonors,
+      smsSentCount: alertResults.length
+    };
+
     res.status(201).json({
       success: true,
-      request: savedRequest,
+      request: finalRequest,
       matchedDonorsCount: matchedDonors.length,
       alertsDispatched: alertResults.length,
+      smsSentCount: alertResults.length,
+      notifiedDonors,
       alerts: alertResults,
       messageTemplate: composeBloodAlertMessage({
         bloodType,

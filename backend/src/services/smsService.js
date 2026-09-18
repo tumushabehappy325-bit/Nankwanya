@@ -205,28 +205,26 @@ async function sendSMS({ to, message, meta = {} }) {
  */
 function composeBloodAlertMessage({
   bloodType,
-  facilityName,
+  facilityName = 'Hospital',
   urgency = 'urgent',
   donorName,
   distanceKm,
   confirmPhone = NANKWANYA_CONFIRM_PHONE
 }) {
-  const urgencyText =
-    urgency.toLowerCase() === 'critical'
-      ? 'critically'
-      : 'urgently';
+  const displayName = donorName ? String(donorName).trim() : 'Donor';
+  const formattedDistance = Number.isFinite(Number(distanceKm))
+    ? Number(distanceKm).toFixed(1)
+    : '0.0';
 
-  const nameParts = donorName
-    ? String(donorName).trim().split(/\s+/).filter(Boolean)
-    : [];
+  let message = `NANKWANYA ALERT: Hello ${displayName}, ${bloodType} blood is urgently needed at ${facilityName}, ${formattedDistance}km away. Confirm: call ${confirmPhone} or open Nankwanya app.`;
 
-  const displayName = nameParts[1] || nameParts[0] || 'Donor';
+  if (message.length > 160) {
+    const overflow = message.length - 160;
+    const shortenedFacility = facilityName.slice(0, Math.max(3, facilityName.length - overflow - 3)) + '...';
+    message = `NANKWANYA ALERT: Hello ${displayName}, ${bloodType} blood is urgently needed at ${shortenedFacility}, ${formattedDistance}km away. Confirm: call ${confirmPhone} or open Nankwanya app.`;
+  }
 
-  const distanceText = Number.isFinite(Number(distanceKm))
-    ? `, ${Number(distanceKm).toFixed(1)}km away`
-    : '';
-
-  return `🩸 NANKWANYA: Hello ${displayName}, ${bloodType} blood is ${urgencyText} needed at ${facilityName}${distanceText}. Call ${confirmPhone} or open Nankwanya app to confirm.`;
+  return message;
 }
 
 module.exports = {
