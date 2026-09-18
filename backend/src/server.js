@@ -22,7 +22,7 @@ const PORT = process.env.PORT || 5000;
 // Middlewares
 app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true })); // Handles Africa's Talking form-urlencoded webhook
+app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 
 // Health / Tribute Root Probe
@@ -33,7 +33,7 @@ app.get('/api/health', (req, res) => {
     tribute: 'In honor of Hajj Mohamod Nankwanya (215 voluntary blood donations, Uganda Red Cross Society)',
     timestamp: new Date().toISOString(),
     geofenceEngine: 'Haversine Spherical Distance (MVP O(n))',
-    smsGateway: "Africa's Talking API (Uganda)",
+    smsGateway: 'Pandora SMS API (Uganda)',
     deployment: process.env.VERCEL ? 'Vercel Serverless' : 'Standalone Node.js Server'
   });
 });

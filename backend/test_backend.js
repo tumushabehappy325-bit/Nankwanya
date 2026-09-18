@@ -11,6 +11,8 @@ const {
 } = require('./src/services/geofence');
 const store = require('./src/models/store');
 const { seedDatabase, MBARARA_FACILITIES } = require('../seed/seedData');
+process.env.PANDORA_USERNAME = process.env.PANDORA_USERNAME || 'test-user';
+process.env.PANDORA_PASSWORD = process.env.PANDORA_PASSWORD || 'test-password';
 const { sendSMS, normalizeUgandaPhone, composeBloodAlertMessage } = require('./src/services/smsService');
 const { sendWhatsAppAlert } = require('./src/services/whatsappService');
 
@@ -110,25 +112,56 @@ async function runTests() {
   });
   assert(matched2km.length <= matched5km.length, `2km radius (${matched2km.length}) is subset of 5km radius (${matched5km.length})`);
 
-  // 5. Africa's Talking Phone Normalization & Message Composition
+  // 5. Pandora Phone Normalization & Message Composition
   console.log('\n[5] Testing Phone Normalization & SMS Services...');
-  assert(normalizeUgandaPhone('0770000001') === '+256770000001', 'Normalizes 077... to +25677...');
-  assert(normalizeUgandaPhone('256770000001') === '+256770000001', 'Normalizes 256... to +256...');
-  assert(normalizeUgandaPhone('+256770000001') === '+256770000001', 'Leaves +256... intact');
+  assert(normalizeUgandaPhone('0770000001') === '256770000001', 'Normalizes 077... to Pandora 25677...');
+  assert(normalizeUgandaPhone('256770000001') === '256770000001', 'Leaves Pandora 256... intact');
+  assert(normalizeUgandaPhone('+256770000001') === '256770000001', 'Normalizes +256... to Pandora 256...');
+  assert(normalizeUgandaPhone('not-a-phone') === '', 'Rejects invalid phone numbers');
 
   const alertMsg = composeBloodAlertMessage({
-    bloodType: 'B+',
-    facilityName: 'MRRH',
-    urgency: 'urgent'
+    bloodType: 'O+',
+    facilityName: 'Mbarara Regional Referral Hospital',
+    urgency: 'urgent',
+    donorName: 'Nankwanya Happy',
+    distanceKm: 3.2
   });
-  assert(alertMsg.includes('Urgent need for B+ blood at MRRH'), 'Composes standard SMS message');
+  assert(
+    alertMsg === '🩸 NANKWANYA: Hello Happy, O+ blood is urgently needed at Mbarara Regional Referral Hospital, 3.2km away. Call 0800 122 422 or open Nankwanya app to confirm.',
+    'Composes personalized Pandora SMS message'
+  );
 
-  const smsRes = await sendSMS({
-    to: '+256770000001',
-    message: alertMsg,
-    meta: { test: true }
-  });
-  assert(smsRes.success === true, 'SMS service dispatches successfully (simulation/sandbox)');
+  const originalFetch = global.fetch;
+  global.fetch = async (url, options) => {
+    const body = new URLSearchParams(options.body);
+    assert(url.includes('send_sms'), 'Uses Pandora SMS API endpoint');
+    assert(options.method === 'POST', 'Sends Pandora request with POST');
+    assert(body.get('number') === '256770000001', 'Sends normalized Pandora phone number');
+    assert(body.get('message') === alertMsg, 'Sends composed alert message');
+    assert(body.get('username') !== null, 'Includes Pandora username parameter');
+    assert(body.get('password') !== null, 'Includes Pandora password parameter');
+
+    return {
+      ok: true,
+      status: 200,
+      async text() {
+        return JSON.stringify({ success: true, message_id: 'pandora-test-message' });
+      }
+    };
+  };
+
+  let smsRes;
+  try {
+    smsRes = await sendSMS({
+      to: '+256770000001',
+      message: alertMsg,
+      meta: { test: true }
+    });
+  } finally {
+    global.fetch = originalFetch;
+  }
+  assert(smsRes.success === true, 'SMS service dispatches successfully through Pandora response handling');
+  assert(smsRes.alertRecord.provider === 'Pandora SMS', 'SMS alert record identifies Pandora provider');
 
   const waRes = await sendWhatsAppAlert({
     to: '+256770000001',

@@ -57,17 +57,18 @@ router.post('/', async (req, res) => {
       confirmedDonorsCount: 0
     });
 
-    // 4. Compose Alert Message
-    const alertMessage = composeBloodAlertMessage({
-      bloodType,
-      facilityName: facility.name,
-      urgency
-    });
-
-    // 5. Broadcast to matched donors via Africa's Talking SMS (& WhatsApp stub)
+    // 4. Broadcast to matched donors via Pandora SMS (& WhatsApp stub)
     const alertResults = [];
 
     for (const donor of matchedDonors) {
+      const alertMessage = composeBloodAlertMessage({
+        bloodType,
+        facilityName: facility.name,
+        urgency,
+        donorName: donor.name,
+        distanceKm: donor.distanceKm
+      });
+
       const alertMeta = {
         requestId: savedRequest.id,
         donorId: donor.id,
@@ -77,7 +78,7 @@ router.post('/', async (req, res) => {
         distanceKm: donor.distanceKm
       };
 
-      // Real Africa's Talking SMS attempt
+      // Real Pandora SMS attempt
       const smsResult = await sendSMS({
         to: donor.phone,
         message: alertMessage,
@@ -121,7 +122,13 @@ router.post('/', async (req, res) => {
       matchedDonorsCount: matchedDonors.length,
       alertsDispatched: alertResults.length,
       alerts: alertResults,
-      messageTemplate: alertMessage
+      messageTemplate: composeBloodAlertMessage({
+        bloodType,
+        facilityName: facility.name,
+        urgency,
+        donorName: 'Donor',
+        distanceKm: 0
+      })
     });
   } catch (err) {
     console.error('[Blood Request] Error:', err);

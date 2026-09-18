@@ -1,159 +1,236 @@
 /**
- * Africa's Talking SMS Gateway Service for Nankwanya
- * 
- * Supports:
- * - Africa's Talking Live & Sandbox environments (Username: sandbox)
- * - Uganda mobile numbers (+256...)
- * - Automatic message formatting: "Urgent need for [bloodType] blood at [facility]. Reply YES if available. - Nankwanya"
- * - Graceful fallback / simulation logging when running without active credentials or network
+ * Pandora SMS Gateway Service for Nankwanya
+ *
+ * One-way SMS notifications to Ugandan donors.
+ * Uses Pandora SMS API.
  */
 
 require('dotenv').config();
 
-let africasTalkingClient = null;
-let smsClient = null;
+const PANDORA_API_URL =
+  process.env.PANDORA_API_URL ||
+  'https://www.sms.thepandoranetworks.com/API/send_sms/';
 
-const AT_USERNAME = process.env.AT_USERNAME || 'sandbox';
-const AT_API_KEY = process.env.AT_API_KEY || '';
-const AT_SENDER_ID = process.env.AT_SENDER_ID || undefined; // e.g. 'Nankwanya' if approved, undefined for sandbox default
+const PANDORA_USERNAME = process.env.PANDORA_USERNAME || '';
+const PANDORA_PASSWORD = process.env.PANDORA_PASSWORD || '';
+const PANDORA_SENDER_ID = process.env.PANDORA_SENDER_ID || 'Nankwanya';
 
-function initAfricasTalking() {
-  if (smsClient) return smsClient;
+const PANDORA_MESSAGE_TYPE =
+  process.env.PANDORA_MESSAGE_TYPE || 'non_customised';
 
-  if (AT_API_KEY && AT_API_KEY !== 'YOUR_AFRICAS_TALKING_API_KEY') {
-    try {
-      const AfricasTalking = require('africastalking');
-      africasTalkingClient = AfricasTalking({
-        apiKey: AT_API_KEY,
-        username: AT_USERNAME
-      });
-      smsClient = africasTalkingClient.SMS;
-      console.log(`[SMS Service] Initialized Africa's Talking SDK with username: ${AT_USERNAME}`);
-    } catch (err) {
-      console.warn(`[SMS Service] Failed to initialize Africa's Talking SDK: ${err.message}. Falling back to simulation mode.`);
-    }
-  } else {
-    console.log(`[SMS Service] Running in sandbox/simulation mode (AT_API_KEY not configured or placeholder).`);
+const PANDORA_MESSAGE_CATEGORY =
+  process.env.PANDORA_MESSAGE_CATEGORY || 'bulk';
+
+const NANKWANYA_CONFIRM_PHONE =
+  process.env.NANKWANYA_CONFIRM_PHONE || '0800 122 422';
+
+function getPandoraErrorMessage(data, fallback) {
+  if (data?.error_message) return data.error_message;
+  if (Array.isArray(data?.messages) && data.messages.length > 0) {
+    return data.messages.join('; ');
   }
-  return smsClient;
+  if (data?.message) return data.message;
+  return fallback;
 }
 
 /**
- * Format phone number to international E.164 format (+256...)
- * @param {string} phone
- * @returns {string}
+ * Normalize Ugandan phone numbers to Pandora format.
+ *
+ * Examples:
+ * 0770000000  -> 256770000000
+ * +256770000000 -> 256770000000
+ * 256770000000 -> 256770000000
  */
 function normalizeUgandaPhone(phone) {
   if (!phone) return '';
-  let cleaned = phone.replace(/[\s\-()]/g, '');
+
+  let cleaned = String(phone).replace(/\D/g, '');
+
   if (cleaned.startsWith('0')) {
-    cleaned = '+256' + cleaned.substring(1);
-  } else if (cleaned.startsWith('256')) {
-    cleaned = '+' + cleaned;
-  } else if (!cleaned.startsWith('+')) {
-    cleaned = '+256' + cleaned;
+    cleaned = '256' + cleaned.substring(1);
+  } else if (!cleaned.startsWith('256')) {
+    cleaned = '256' + cleaned;
   }
-  return cleaned;
+
+  return /^256\d{9}$/.test(cleaned) ? cleaned : '';
 }
 
 /**
- * Send an SMS alert to a donor
- * @param {Object} params
- * @param {string} params.to - Recipient phone number (e.g. +256770000001)
- * @param {string} params.message - Alert message text
- * @param {Object} [params.meta] - Additional metadata (requestId, donorId, facilityName, etc.)
- * @returns {Promise<Object>} Delivery result object
+ * Send an SMS through Pandora.
  */
 async function sendSMS({ to, message, meta = {} }) {
   const formattedPhone = normalizeUgandaPhone(to);
-  const client = initAfricasTalking();
-
   const timestamp = new Date().toISOString();
+
+  if (!formattedPhone) {
+    return {
+      success: false,
+      error: 'Invalid recipient phone number'
+    };
+  }
+
+  if (!PANDORA_USERNAME || !PANDORA_PASSWORD) {
+    console.warn(
+      '[SMS Service] Pandora credentials are not configured.'
+    );
+
+    return {
+      success: false,
+      error: 'Pandora SMS credentials are not configured'
+    };
+  }
+
+  if (!message || message.length > 160) {
+    return {
+      success: false,
+      error: 'SMS message must contain between 1 and 160 characters'
+    };
+  }
+
   const alertRecord = {
     channel: 'sms',
     recipient: formattedPhone,
     message,
     sentAt: timestamp,
     meta,
-    isSandbox: AT_USERNAME === 'sandbox',
-    status: 'sent',
-    provider: "Africa's Talking"
+    status: 'pending',
+    provider: 'Pandora SMS'
   };
 
-  if (client && AT_API_KEY && AT_API_KEY !== 'YOUR_AFRICAS_TALKING_API_KEY') {
+  try {
+    const parameters = new URLSearchParams();
+
+    parameters.append('number', formattedPhone);
+    parameters.append('message', message);
+    parameters.append('sender', PANDORA_SENDER_ID);
+    parameters.append('username', PANDORA_USERNAME);
+    parameters.append('password', PANDORA_PASSWORD);
+    parameters.append('message_type', PANDORA_MESSAGE_TYPE);
+    parameters.append('message_category', PANDORA_MESSAGE_CATEGORY);
+
+    console.log(
+      `[SMS Service] Sending Pandora SMS to ${formattedPhone}...`
+    );
+
+    const response = await fetch(PANDORA_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: parameters.toString()
+    });
+
+    const responseText = await response.text();
+    let data;
+
     try {
-      const options = {
-        to: [formattedPhone],
-        message: message,
-        ...(AT_SENDER_ID && AT_USERNAME !== 'sandbox' ? { from: AT_SENDER_ID } : {})
+      data = responseText ? JSON.parse(responseText) : {};
+    } catch (parseError) {
+      data = {
+        success: false,
+        error_message: responseText || parseError.message
       };
+    }
 
-      console.log(`[SMS Service] Dispatching via Africa's Talking to ${formattedPhone}...`);
-      const response = await client.send(options);
-      
-      const recipients = response?.SMSMessageData?.Recipients || [];
-      const recipientResult = recipients[0] || {};
+    alertRecord.providerResponse = data;
 
-      alertRecord.providerResponse = response;
-      alertRecord.status = recipientResult.status === 'Success' ? 'delivered' : 'sent';
-      alertRecord.messageId = recipientResult.messageId || 'at-' + Date.now();
-      alertRecord.cost = recipientResult.cost || 'UGX 0';
-
-      console.log(`[SMS Service] Africa's Talking API Response:`, JSON.stringify(recipientResult));
-      return {
-        success: true,
-        alertRecord,
-        rawResponse: response
-      };
-    } catch (err) {
-      console.error(`[SMS Service] Africa's Talking API Error: ${err.message}`);
+    if (!response.ok) {
       alertRecord.status = 'failed';
-      alertRecord.errorMessage = err.message;
+      alertRecord.errorMessage = getPandoraErrorMessage(
+        data,
+        `Pandora SMS API returned HTTP ${response.status}`
+      );
 
       return {
         success: false,
         alertRecord,
-        error: err.message
+        error: alertRecord.errorMessage
       };
     }
-  } else {
-    // Simulated delivery for offline development, judge demos without active balance, or sandbox preview
-    console.log(`\n================== [SMS SIMULATOR: AFRICA'S TALKING] ==================`);
-    console.log(`To:        ${formattedPhone} (Uganda)`);
-    console.log(`From:      Nankwanya [AT Sandbox: ${AT_USERNAME}]`);
-    console.log(`Message:   "${message}"`);
-    console.log(`Timestamp: ${timestamp}`);
-    console.log(`Metadata:  `, JSON.stringify(meta));
-    console.log(`========================================================================\n`);
 
-    alertRecord.messageId = `sim-at-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    alertRecord.status = 'delivered'; // simulated instant delivery
-    alertRecord.isSimulated = true;
+    if (data.success === true || data.success === 'true') {
+      alertRecord.status = 'sent';
+      alertRecord.messageId = data.message_id || data.messageId || `pandora-${Date.now()}`;
+
+      console.log(
+        `[SMS Service] Pandora SMS sent successfully to ${formattedPhone}`
+      );
+
+      return {
+        success: true,
+        alertRecord,
+        rawResponse: data
+      };
+    }
+
+    alertRecord.status = 'failed';
+    alertRecord.errorMessage = getPandoraErrorMessage(
+      data,
+      'Pandora SMS API returned an error'
+    );
+
+    console.error(
+      '[SMS Service] Pandora API Error:',
+      alertRecord.errorMessage
+    );
 
     return {
-      success: true,
+      success: false,
       alertRecord,
-      simulated: true
+      error: alertRecord.errorMessage
+    };
+
+  } catch (error) {
+    alertRecord.status = 'failed';
+    alertRecord.errorMessage = error.message;
+
+    console.error(
+      '[SMS Service] Pandora connection error:',
+      error.message
+    );
+
+    return {
+      success: false,
+      alertRecord,
+      error: error.message
     };
   }
 }
 
 /**
- * Format blood request alert text
- * @param {Object} params
- * @param {string} params.bloodType - Blood type needed (e.g. 'B+')
- * @param {string} params.facilityName - Name of hospital
- * @param {string} [params.urgency] - 'urgent' | 'critical' | 'normal'
- * @returns {string}
+ * Compose a blood donation alert.
+ *
+ * This is ONE-WAY SMS.
+ * Donors do not reply by SMS.
  */
-function composeBloodAlertMessage({ bloodType, facilityName, urgency = 'urgent' }) {
-  const urgencyPrefix = urgency.toLowerCase() === 'critical' ? 'CRITICAL EMERGENCY' : 'Urgent need';
-  return `${urgencyPrefix} for ${bloodType} blood at ${facilityName}. Reply YES if available to donate today. - Nankwanya`;
+function composeBloodAlertMessage({
+  bloodType,
+  facilityName,
+  urgency = 'urgent',
+  donorName,
+  distanceKm,
+  confirmPhone = NANKWANYA_CONFIRM_PHONE
+}) {
+  const urgencyText =
+    urgency.toLowerCase() === 'critical'
+      ? 'critically'
+      : 'urgently';
+
+  const nameParts = donorName
+    ? String(donorName).trim().split(/\s+/).filter(Boolean)
+    : [];
+
+  const displayName = nameParts[1] || nameParts[0] || 'Donor';
+
+  const distanceText = Number.isFinite(Number(distanceKm))
+    ? `, ${Number(distanceKm).toFixed(1)}km away`
+    : '';
+
+  return `🩸 NANKWANYA: Hello ${displayName}, ${bloodType} blood is ${urgencyText} needed at ${facilityName}${distanceText}. Call ${confirmPhone} or open Nankwanya app to confirm.`;
 }
 
 module.exports = {
   sendSMS,
   normalizeUgandaPhone,
-  composeBloodAlertMessage,
-  AT_USERNAME
+  composeBloodAlertMessage
 };

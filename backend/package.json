@@ -6,13 +6,20 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
+    "test": "node test_backend.js",
+    "test:pandora": "node test_pandora.js",
     "seed": "node ../seed/seedData.js"
   },
-  "keywords": ["blood-donation", "geofencing", "uganda", "africastalking", "firebase"],
+  "keywords": [
+    "blood-donation",
+    "geofencing",
+    "uganda",
+    "pandora-sms",
+    "firebase"
+  ],
   "author": "Nankwanya Platform",
   "license": "MIT",
   "dependencies": {
-    "africastalking": "^0.6.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",

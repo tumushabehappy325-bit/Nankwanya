@@ -59,8 +59,8 @@ router.post('/:id/respond', async (req, res) => {
   }
 });
 
-// POST /api/sms/inbound - Africa's Talking Inbound SMS Webhook
-// Africa's Talking posts incoming SMS to this endpoint (from, text, to, date, id)
+// POST /api/alerts/sms-inbound - Legacy inbound SMS webhook / simulator helper.
+// Pandora dispatch is one-way; keep this route for demos and providers that post { from, text } replies.
 router.post('/sms-inbound', async (req, res) => {
   try {
     const { from, text } = req.body;
@@ -104,7 +104,7 @@ router.post('/sms-inbound', async (req, res) => {
 
     console.log(`[Inbound SMS Webhook] Matched alert ${latestAlert.id} for ${donor.name} -> Status: ${newStatus.toUpperCase()}`);
 
-    // Return plain text response or 200 OK for Africa's Talking
+    // Return a provider-friendly 200 response.
     res.status(200).json({
       success: true,
       message: `Thank you ${donor.name}. Your response (${newStatus}) has been recorded at ${latestAlert.facilityName}. - Nankwanya`,
