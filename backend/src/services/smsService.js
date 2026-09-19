@@ -205,23 +205,20 @@ async function sendSMS({ to, message, meta = {} }) {
  */
 function composeBloodAlertMessage({
   bloodType,
-  facilityName = 'Hospital',
+  facilityName = 'MRRH',
   urgency = 'urgent',
   donorName,
   distanceKm,
-  confirmPhone = NANKWANYA_CONFIRM_PHONE
+  confirmPhone = NANKWANYA_CONFIRM_PHONE.replace(/\s+/g, ''),
+  donationDay = process.env.NANKWANYA_DONATION_DAY || 'Saturday',
+  donationTime = process.env.NANKWANYA_DONATION_TIME || '9AM-2PM'
 }) {
   const displayName = donorName ? String(donorName).trim() : 'Donor';
-  const formattedDistance = Number.isFinite(Number(distanceKm))
-    ? Number(distanceKm).toFixed(1)
-    : '0.0';
 
-  let message = `NANKWANYA ALERT: Hello ${displayName}, ${bloodType} blood is urgently needed at ${facilityName}, ${formattedDistance}km away. Confirm: call ${confirmPhone} or open Nankwanya app.`;
+  let message = `Hello ${displayName}! UBTS/Nankwanya invites you to a Blood Donation Day at ${facilityName} on ${donationDay}, ${donationTime}. You can save a life again! Call ${confirmPhone} or open Nankwanya app.`;
 
   if (message.length > 160) {
-    const overflow = message.length - 160;
-    const shortenedFacility = facilityName.slice(0, Math.max(3, facilityName.length - overflow - 3)) + '...';
-    message = `NANKWANYA ALERT: Hello ${displayName}, ${bloodType} blood is urgently needed at ${shortenedFacility}, ${formattedDistance}km away. Confirm: call ${confirmPhone} or open Nankwanya app.`;
+    message = `Hello ${displayName}! UBTS/Nankwanya invites you to a Blood Donation Day at ${facilityName} on ${donationDay}, ${donationTime}. You can save a life again! Call ${confirmPhone}.`;
   }
 
   return message;

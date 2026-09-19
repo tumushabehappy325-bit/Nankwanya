@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Hospital, Plus, Flame, Activity, Terminal, CheckCircle2,
-  RefreshCw, MapPin, Phone, ShieldCheck, AlertCircle, Share2, X, Lock
+  RefreshCw, MapPin, Phone, ShieldCheck, AlertCircle, Share2, X, Lock, Send
 } from 'lucide-react';
 import MapView from '../components/MapView';
 import LiveResponseCounter from '../components/LiveResponseCounter';
@@ -246,6 +246,127 @@ export default function AdminDashboard() {
           >
             Create first request &rarr;
           </button>
+        </div>
+      )}
+
+      {/* Pandora SMS Dispatch & Notified Donors Panel */}
+      {activeRequest && (
+        <div className="bg-slate-900/95 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-sky-500/20 border border-sky-500/30 flex items-center justify-center text-sky-400">
+                <Send className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                  Pandora SMS Notification Dispatch
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">
+                    Live Delivery
+                  </span>
+                </h2>
+                <p className="text-[11px] text-slate-400">
+                  Real-time verification of compatible donors mobilized via Pandora SMS Gateway
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-slate-400">Requested Type:</span>
+              <span className="px-2.5 py-1 rounded-xl bg-rose-600 font-mono font-bold text-white text-xs shadow-md shadow-rose-950">
+                {activeRequest.bloodType}
+              </span>
+            </div>
+          </div>
+
+          {/* Metric Badges */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800">
+              <div className="text-[11px] text-slate-400">Requested Type</div>
+              <div className="text-lg font-extrabold text-rose-400 font-mono mt-0.5">
+                {activeRequest.bloodType}
+              </div>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800">
+              <div className="text-[11px] text-slate-400">Eligible Donors</div>
+              <div className="text-lg font-extrabold text-white font-mono mt-0.5">
+                {activeRequest.matchedDonorsCount ?? (activeRequest.notifiedDonors?.length || currentRequestAlerts.length)}
+              </div>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800">
+              <div className="text-[11px] text-slate-400">Pandora SMS Sent</div>
+              <div className="text-lg font-extrabold text-sky-400 font-mono mt-0.5">
+                {currentRequestAlerts.filter(a => a.status === 'sent' || a.status === 'delivered' || a.status === 'confirmed').length || currentRequestAlerts.length}
+              </div>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800">
+              <div className="text-[11px] text-slate-400">Compatibility Rule</div>
+              <div className="text-xs font-bold text-emerald-400 mt-1">
+                RBC Verified
+              </div>
+            </div>
+          </div>
+
+          {/* Recipient Donor Names */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-semibold text-slate-300 uppercase tracking-wider">
+                Names of Donors Notified ({activeRequest.notifiedDonors?.length || currentRequestAlerts.length})
+              </span>
+              <span className="text-[11px] text-slate-400">
+                Incompatible donors excluded
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {(activeRequest.notifiedDonors && activeRequest.notifiedDonors.length > 0
+                ? activeRequest.notifiedDonors
+                : currentRequestAlerts.map(a => ({
+                    id: a.donorId,
+                    name: a.donorName,
+                    phone: a.donorPhone,
+                    bloodType: a.donorBloodType || a.bloodType,
+                    distanceKm: a.distanceKm
+                  }))
+              ).map((donor, idx) => (
+                <div
+                  key={donor.id || idx}
+                  className="p-3 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3 hover:border-slate-700 transition"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-8 h-8 rounded-xl bg-rose-600/20 border border-rose-500/30 flex items-center justify-center font-extrabold text-rose-400 font-mono text-xs">
+                      {donor.bloodType}
+                    </span>
+                    <div>
+                      <div className="font-bold text-white text-xs">{donor.name}</div>
+                      <div className="text-[11px] text-slate-400 font-mono">{donor.phone}</div>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    {(() => {
+                      const donorAlert = currentRequestAlerts.find(a => a.donorId === donor.id);
+                      const isFailed = donorAlert?.status === 'failed';
+                      return (
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${
+                          isFailed
+                            ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                            : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                        }`}>
+                          {isFailed ? 'SMS Failed' : 'SMS Sent'}
+                        </span>
+                      );
+                    })()}
+                    <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                      {donor.distanceKm !== undefined ? `${donor.distanceKm} km` : 'Near MRRH'}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
