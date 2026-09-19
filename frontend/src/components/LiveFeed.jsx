@@ -75,7 +75,7 @@ export default function LiveFeed({ alerts = [] }) {
             <Radio className="w-8 h-8 mb-2 opacity-40 animate-pulse" />
             <p className="text-xs">No broadcast active yet.</p>
             <p className="text-[11px] text-slate-600 mt-1">
-              Create a blood request to trigger Africa's Talking SMS alerts and watch live responses.
+              Create a blood request to trigger Pandora SMS alerts and watch live responses.
             </p>
           </div>
         ) : (
@@ -97,7 +97,7 @@ export default function LiveFeed({ alerts = [] }) {
                     : 'bg-slate-800/40 border-slate-700/40 text-slate-400'
                 }`}
               >
-                {/* Header: Donor Initials + Distance + Blood Type */}
+                {/* Header: Donor Name + Distance + Blood Type */}
                 <div className="flex items-start justify-between gap-2 mb-1.5">
                   <div className="font-semibold text-slate-100 flex items-center gap-1.5">
                     {isConfirmed && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
@@ -105,7 +105,7 @@ export default function LiveFeed({ alerts = [] }) {
                     {isPending && <Clock className="w-3.5 h-3.5 text-sky-400 shrink-0" />}
                     
                     <span className="font-bold text-slate-100 bg-slate-800/90 px-1.5 py-0.5 rounded border border-slate-700">
-                      Donor {initials}
+                      {alert.donorName || `Donor ${initials}`}
                     </span>
 
                     <span className="text-[11px] text-slate-400 font-normal">
@@ -131,9 +131,9 @@ export default function LiveFeed({ alerts = [] }) {
                   <div className="flex items-center gap-1 text-[10px] text-slate-500">
                     <Smartphone className="w-3 h-3 text-slate-400" />
                     <span>
-                      {alert.responseChannel === 'sms' ? "Africa's Talking SMS" :
+                      {alert.responseChannel === 'sms' ? "Pandora SMS" :
                        alert.responseChannel === 'sms_simulated' ? 'SMS Inbound' :
-                       alert.responseChannel === 'inapp' ? 'In-App Tap' : 'SMS Outbound'}
+                       alert.responseChannel === 'inapp' ? 'In-App Tap' : 'Pandora SMS'}
                     </span>
                   </div>
 

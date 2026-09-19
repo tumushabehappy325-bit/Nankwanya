@@ -15,16 +15,16 @@ const DEFAULT_ADMIN = {
 };
 
 const DEFAULT_DONOR = {
-  id: 'usr_donor_1',
-  name: 'Katushabe Allen',
-  phone: '+256770000001',
+  id: 'usr_donor_genius',
+  name: 'Genius',
+  phone: '+256783270834',
   role: 'donor',
-  bloodType: 'O+',
-  lat: -0.6020,
-  lng: 30.6510,
+  bloodType: 'B+',
+  lat: -0.6065,
+  lng: 30.6545,
   neighborhood: 'Kamukuzi, Mbarara',
-  lastDonationDate: '2026-05-14',
-  totalDonations: 6
+  lastDonationDate: null,
+  totalDonations: 4
 };
 
 export function AuthProvider({ children }) {

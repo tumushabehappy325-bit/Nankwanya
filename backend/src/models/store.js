@@ -199,7 +199,9 @@ class DataStore {
       status: request.status || 'active', // active, fulfilled, cancelled
       createdAt: request.createdAt || new Date().toISOString(),
       matchedDonorsCount: Number(request.matchedDonorsCount) || 0,
-      confirmedDonorsCount: Number(request.confirmedDonorsCount) || 0
+      confirmedDonorsCount: Number(request.confirmedDonorsCount) || 0,
+      smsSentCount: Number(request.smsSentCount) || 0,
+      notifiedDonors: Array.isArray(request.notifiedDonors) ? request.notifiedDonors : []
     };
 
     if (this.db) {

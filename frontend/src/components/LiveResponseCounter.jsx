@@ -23,7 +23,7 @@ export default function LiveResponseCounter({ activeRequest, alerts = [] }) {
           <span className="text-2xl sm:text-3xl font-extrabold text-white font-mono">
             {totalAlerted}
           </span>
-          <span className="text-[11px] text-sky-400 font-medium">via SMS/AT</span>
+          <span className="text-[11px] text-sky-400 font-medium">via Pandora SMS</span>
         </div>
       </div>
 

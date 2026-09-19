@@ -253,8 +253,8 @@ export default function DonorPortal() {
               {donor?.bloodType || 'O+'}
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">{donor?.name || 'Katushabe Allen'}</h2>
-              <p className="text-xs text-slate-400 font-mono mt-0.5">{donor?.phone || '+256770000001'}</p>
+              <h2 className="text-lg font-bold text-white">{donor?.name || 'Genius'}</h2>
+              <p className="text-xs text-slate-400 font-mono mt-0.5">{donor?.phone || '+256783270834'}</p>
               <div className="flex items-center gap-1.5 text-xs text-slate-300 mt-1">
                 <MapPin className="w-3.5 h-3.5 text-rose-400" />
                 <span>{donor?.neighborhood || 'Kamukuzi, Mbarara'}</span>
@@ -346,7 +346,7 @@ export default function DonorPortal() {
               <h3 className="font-bold text-base text-white">Emergency Blood Alert</h3>
             </div>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 font-mono font-bold uppercase">
-              Africa's Talking SMS
+              Pandora SMS
             </span>
           </div>
 

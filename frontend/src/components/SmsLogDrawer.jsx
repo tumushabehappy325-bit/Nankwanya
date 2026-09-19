@@ -30,7 +30,7 @@ export default function SmsLogDrawer({ isOpen, onClose, alerts = [] }) {
             </div>
             <div>
               <h2 className="text-base font-bold text-white flex items-center gap-2">
-                Africa's Talking SMS Gateway — Dispatch Audit Log
+                Pandora SMS Gateway — Dispatch Audit Log
                 <span className="text-xs bg-sky-500/20 text-sky-300 border border-sky-500/30 px-2 py-0.5 rounded font-mono">
                   Live API Engine
                 </span>
@@ -81,15 +81,19 @@ export default function SmsLogDrawer({ isOpen, onClose, alerts = [] }) {
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
                   <div className="flex items-center gap-2">
                     <span className="text-slate-500">{new Date(log.sentAt || Date.now()).toLocaleTimeString()}</span>
-                    <span className="font-bold text-slate-200">Donor {getInitials(log.donorName)}</span>
-                    <span className="text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800 font-mono text-[10px] flex items-center gap-1">
-                      <Lock className="w-2.5 h-2.5 text-slate-500" />
-                      {log.donorPhone ? `${log.donorPhone.slice(0, 6)} ••• •••` : 'Protected'}
+                    <span className="font-bold text-slate-200">{log.donorName || `Donor ${getInitials(log.donorName)}`}</span>
+                    {log.donorBloodType && (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-600/20 text-rose-300 border border-rose-500/30">
+                        {log.donorBloodType}
+                      </span>
+                    )}
+                    <span className="text-slate-300 bg-slate-950 px-2 py-0.5 rounded border border-slate-800 font-mono text-[10px] flex items-center gap-1">
+                      {log.donorPhone || 'No phone'}
                     </span>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <span className="text-slate-400">{log.channel?.toUpperCase()}</span>
+                    <span className="text-slate-400 font-mono text-[10px]">{log.provider || 'Pandora SMS'}</span>
                     <span className={`px-2 py-0.5 rounded-full font-bold uppercase text-[10px] ${
                       log.status === 'confirmed' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' :
                       log.status === 'failed' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' :
@@ -118,7 +122,7 @@ export default function SmsLogDrawer({ isOpen, onClose, alerts = [] }) {
 
         {/* Footer */}
         <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-          <span>Africa's Talking Uganda Gateway Integration</span>
+          <span>Pandora SMS Gateway Integration (Uganda)</span>
           <button
             onClick={onClose}
             className="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-medium transition"

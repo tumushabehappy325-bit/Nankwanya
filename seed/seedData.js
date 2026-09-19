@@ -74,46 +74,114 @@ const BLOOD_TYPE_DISTRIBUTION = [
   'AB-'                                                       // 2.5%
 ];
 
-function generateSeedDonors() {
-  const donors = [];
+const DEMO_DONORS = [
+  {
+    id: 'usr_donor_genius',
+    name: 'Genius',
+    phone: '+256783270834',
+    role: 'donor',
+    bloodType: 'B+',
+    lat: -0.6065,
+    lng: 30.6545,
+    neighborhood: 'Kamukuzi, Mbarara',
+    lastDonationDate: null,
+    totalDonations: 4,
+    consentGiven: true,
+    consentTimestamp: new Date().toISOString(),
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'usr_donor_joshua',
+    name: 'Joshua',
+    phone: '+256785288413',
+    role: 'donor',
+    bloodType: 'A+',
+    lat: -0.6075,
+    lng: 30.6555,
+    neighborhood: 'High Street, Mbarara',
+    lastDonationDate: null,
+    totalDonations: 6,
+    consentGiven: true,
+    consentTimestamp: new Date().toISOString(),
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'usr_donor_festo',
+    name: 'Festo',
+    phone: '+256743923385',
+    role: 'donor',
+    bloodType: 'B-',
+    lat: -0.6105,
+    lng: 30.6585,
+    neighborhood: 'Kakoba, Mbarara',
+    lastDonationDate: null,
+    totalDonations: 2,
+    consentGiven: true,
+    consentTimestamp: new Date().toISOString(),
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'usr_donor_patricia',
+    name: 'Patricia',
+    phone: '+256795236437',
+    role: 'donor',
+    bloodType: 'A+',
+    lat: -0.6095,
+    lng: 30.6535,
+    neighborhood: 'Kamukuzi, Mbarara',
+    lastDonationDate: null,
+    totalDonations: 5,
+    consentGiven: true,
+    consentTimestamp: new Date().toISOString(),
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'usr_donor_talent',
+    name: 'Talent',
+    phone: '+256751503899',
+    role: 'donor',
+    bloodType: 'O-',
+    lat: -0.6115,
+    lng: 30.6575,
+    neighborhood: 'Katete, Mbarara',
+    lastDonationDate: null,
+    totalDonations: 7,
+    consentGiven: true,
+    consentTimestamp: new Date().toISOString(),
+    createdAt: new Date().toISOString()
+  }
+];
+
+function generateSeedDonors(includeExtended = false) {
+  if (!includeExtended) {
+    return [...DEMO_DONORS];
+  }
+
+  const donors = [...DEMO_DONORS];
 
   UGANDAN_NAMES.forEach((name, index) => {
     const neighborhood = MBARARA_NEIGHBORHOODS[index % MBARARA_NEIGHBORHOODS.length];
-    // Small random jitter ±0.008 degrees (~0.9km) around neighborhood center
     const jitterLat = (Math.random() - 0.5) * 0.016;
     const jitterLng = (Math.random() - 0.5) * 0.016;
     const bloodType = BLOOD_TYPE_DISTRIBUTION[index % BLOOD_TYPE_DISTRIBUTION.length];
     const phoneNum = String(index + 1).padStart(3, '0');
 
-    // Vary last donation interval across donors:
-    // Some recent (<90 days: e.g. 14, 28, 45, 60 days ago) to visibly demonstrate eligibility filtering during live demos,
-    // some eligible (>=90 days: e.g. 95, 120, 180 days ago), and some first-time voluntary donors (null).
     let daysAgo;
-    let lastDonation;
     if (index === 1) {
-      daysAgo = 14; // Exactly 2 weeks ago: prime demo case ("notice this donor didn't get alerted - gave blood 2 weeks ago")
+      daysAgo = 14;
     } else if (index === 2) {
-      daysAgo = 35; // ~5 weeks ago: recently donated
-    } else if (index === 4) {
-      daysAgo = 56; // 8 weeks ago: recently donated
-    } else if (index === 7) {
-      daysAgo = 72; // ~10 weeks ago: recently donated
+      daysAgo = 35;
     } else if (index % 5 === 0) {
-      daysAgo = Math.floor(Math.random() * 60) + 14; // 14-74 days ago (ineligible)
-    } else if (index % 7 === 0) {
-      daysAgo = null; // First-time voluntary donor (eligible)
+      daysAgo = 45;
     } else {
-      daysAgo = Math.floor(Math.random() * 120) + 95; // 95-215 days ago (eligible)
+      daysAgo = 120;
     }
 
-    lastDonation = daysAgo !== null
-      ? new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-      : null;
-
+    const lastDonation = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const createdAt = new Date(Date.now() - (index + 1) * 86400000).toISOString();
 
     donors.push({
-      id: `usr_donor_${index + 1}`,
+      id: `usr_donor_ext_${index + 1}`,
       name,
       phone: `+256770000${phoneNum}`,
       role: 'donor',
@@ -122,7 +190,7 @@ function generateSeedDonors() {
       lng: Math.round((neighborhood.lng + jitterLng) * 100000) / 100000,
       lastDonationDate: lastDonation,
       neighborhood: neighborhood.name,
-      totalDonations: daysAgo === null ? 0 : Math.floor(Math.random() * 8) + 1,
+      totalDonations: Math.floor(Math.random() * 8) + 1,
       consentGiven: true,
       consentTimestamp: createdAt,
       createdAt
@@ -190,6 +258,7 @@ if (require.main === module) {
 module.exports = {
   MBARARA_FACILITIES,
   MBARARA_NEIGHBORHOODS,
+  DEMO_DONORS,
   generateSeedDonors,
   DEMO_ADMIN,
   seedDatabase
